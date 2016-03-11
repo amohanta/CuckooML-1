@@ -5,9 +5,7 @@ import logging
 import argparse
 import json
 from sklearn.feature_extraction import DictVectorizer
-from sklearn import cluster
-from matplotlib import pyplot
-import numpy as np
+from kmeans import KMeans
 
 logger = logging.getLogger("CuckooML")
 logger.setLevel(logging.WARN)
@@ -41,39 +39,13 @@ def parse_args():
     parser.add_argument("-v", "--verbosity", action="count", default=0)
     return parser.parse_args()
 
-def cluster_data(data, args):
-    k_means = cluster.KMeans(n_clusters=args.num_class)
-    k_means.fit(data)
-
-    centroids = k_means.cluster_centers_
-    labels = k_means.labels_
-
-    print labels
-    
-    data = np.array(data)
-    
-    #plot_cluster(data, labels, centroids, args.num_class)
-
-def plot_cluster(data, labels, centroids, no_clusters):
-    #print len(data)
-
-    for i in range(no_clusters):
-        ds = data[np.where(labels==i)]
-        #print len(ds)
-        # plot the data observations
-        pyplot.plot(ds[:,1],ds[:,2],'o')
-        # plot the centroids
-        lines = pyplot.plot(centroids[i,1],centroids[i,2],'kx')
-        # make the centroid x's bigger
-        pyplot.setp(lines, ms=15.0)
-        pyplot.setp(lines, mew=2.0)
-    pyplot.show()
-
 def feature_extraction(data, args):
     vectorizer = DictVectorizer(sparse=False)
     vectorized_data = vectorizer.fit_transform(data)
 
-    cluster_data(vectorized_data, args)
+    kmeans_obj = KMeans(vectorized_data, args)
+    kmeans_obj.cluster_data()
+    kmeans_obj.plot_cluster()
 
 def main(args):
     files = os.listdir(args.input_dir)
@@ -84,7 +56,7 @@ def main(args):
 
     for file_name in files:
         file_path = os.path.join(args.input_dir, file_name)
-        
+
         #print file_name
 
         with open(file_path) as input_file:
@@ -103,11 +75,11 @@ def main(args):
                 temp = file_content["virustotal"]["scans"]
                 if not scanners:
                     for key in temp:
-                        scanners.append(key)                    
-                
+                        scanners.append(key)
+
                 for key in scanners:
                     if temp.has_key(key):
-                        if temp[key]["detected"]==True:
+                        if temp[key]["detected"] == True:
                             data[-1][key + ".result"] = temp[key]["result"]
                         else:
                             data[-1][key + ".result"] = "not_detection"
@@ -117,7 +89,6 @@ def main(args):
             except Exception, e:
                 for key in scanners:
                     data[-1][key + ".result"] = "unknown"
-                pass
 
     feature_extraction(data, args)
 
