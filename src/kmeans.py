@@ -6,6 +6,7 @@
 from sklearn import cluster
 import numpy as np
 from sklearn.metrics import silhouette_score
+from sklearn.metrics.cluster import normalized_mutual_info_score
 from matplotlib import pyplot
 
 class KMeans(object):
@@ -25,6 +26,8 @@ class KMeans(object):
         k_means = cluster.KMeans(n_clusters=self.no_clusters)
         k_means.fit(self.data)
 
+        print self.data
+        
         self.centroids = k_means.cluster_centers_
         self.cluster_labels = k_means.labels_
 
@@ -32,6 +35,8 @@ class KMeans(object):
 
         silhouette_avg = silhouette_score(self.data, self.cluster_labels)
         print silhouette_avg
+
+        #print normalized_mutual_info_score
 
     def find_best_k(self):
         '''
