@@ -5,12 +5,10 @@ import logging
 import argparse
 import json
 from sklearn.feature_extraction import DictVectorizer
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'src')))
 from kmeans import KMeans
 from flask import Flask
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'src')))
 from utils import construct_W, MCFS
-import numpy as np
-import heapq
 
 logger = logging.getLogger("CuckooML")
 logger.setLevel(logging.WARN)
@@ -63,8 +61,8 @@ def parse_args():
         required=False)
     parser.add_argument("-n", "--num_class", metavar="num_class", default=5, \
         type=int, help="Number of Class(es)")
-    parser.add_argument("-f", "--num_features", metavar="num_features", default=25,
-        type=int, help="Number of Feature(s)")
+    parser.add_argument("-f", "--num_features", metavar="num_features", \
+        default=25, type=int, help="Number of Feature(s)")
     parser.add_argument("-v", "--verbosity", action="count", default=0)
     parser.add_argument('--version', action='version', version='%(prog)s 0.1')
     return parser.parse_args()
@@ -73,15 +71,18 @@ def feature_extraction(data, args):
     vectorizer = DictVectorizer(sparse=False)
     vectorized_data = vectorizer.fit_transform(data)
 
-    kwargs = {"metric": "euclidean", "neighborMode": "knn", "weightMode": "heatKernel", "k": 5, 't': 1}
-        
-    W = construct_W.construct_W(vectorized_data, **kwargs)
+    kwargs = {"metric": "euclidean", "neighborMode": "knn", \
+        "weightMode": "heatKernel", "k": 5, 't': 1}
 
-    S = MCFS.mcfs(vectorized_data, args.num_features, W=W, n_clusters=args.num_class)
+    weights = construct_W.construct_W(vectorized_data, **kwargs)
+
+    S = MCFS.mcfs(vectorized_data, args.num_features, \
+        W=weights, n_clusters=args.num_class)
+
     idx = MCFS.feature_ranking(S)
-    print len(idx), len(vectorized_data[0])
     #idx = np.array(idx)
 
+    #Feature Ranking: Extract important num_features features from data.
     new_data = vectorized_data[:, idx[0:args.num_features]]
 
     kmeans_obj = KMeans(new_data, args)
@@ -111,6 +112,9 @@ def main(args):
                     temp = temp[str(key)]
                 data[-1][feature] = temp
 
+
+            '''
+            # Include the results of each scan.
             try:
                 temp = file_content["virustotal"]["scans"]
                 if not scanners:
@@ -129,6 +133,50 @@ def main(args):
             except Exception, e:
                 for key in scanners:
                     data[-1][key + ".result"] = "unknown"
+            '''
+
+
+            # Addition of the Normalized Virustotal result with their respective count value.
+            try:
+                norm_results = file_content["virustotal"]["scans"]
+                
+                for scan_result in norm_results:
+                    if norm_results[scan_result]["detected"]==False:
+                        continue
+                    for result in norm_results[scan_result]["normalized"]:
+                        if str("normalized=" + result) in data[-1]:
+                            data[-1]["normalized=" + result] += 1
+                        else:
+                            data[-1]["normalized=" + result] = 1
+            except Exception, e:
+                pass
+
+
+            #Add Signature Values in Virustotal Results
+            try:
+                signature_result = file_content["signatures"]
+
+                for signature in signature_result:
+                    if str("signature=" + signature["name"]) in data[-1]:
+                        data[-1]["signature=" + signature["name"]] += 1
+                    else:
+                        data[-1]["signature=" + signature["name"]] = 1
+            except Exception, e:
+                pass
+
+
+            #Add Behavioural ApiStats
+            try:
+                behavioural_info = file_content["behavior"]["apistats"]
+                for err_no in behavioural_info:
+                    for key in behavioural_info[err_no]:
+                        if key not in data[-1]:
+                            data[-1][key] = behavioural_info[err_no][key]
+                        else:
+                            data[-1][key] += behavioural_info[err_no][key]
+            except Exception, e:
+                pass
+
 
     feature_extraction(data, args)
 
